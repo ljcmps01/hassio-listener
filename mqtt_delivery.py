@@ -23,7 +23,7 @@ box_topic = "testtopic/box_arduino"
 box_listener = hass.BoxListener(box_topic, config_JSON)
     
 while True:
-    box_listener.client.loop()
+    box_listener.listener_loop()
     
     box_listener.sensor_loop()
     sleep(.5)

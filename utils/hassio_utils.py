@@ -14,12 +14,12 @@ logger.addHandler(journal.JournalHandler())
 
 
 #dev
-# topic_root = "testtopic/test"
-# discovery_root = "testtopic/test"
+topic_root = "testtopic/test"
+discovery_root = "testtopic/test"
 
 #prod
-topic_root = "bingo"
-discovery_root = "homeassistant"
+# topic_root = "bingo"
+# discovery_root = "homeassistant"
 
 class HassioSensor:
     #Generar unico por entidad (temperatura y humedad independientes)
@@ -54,7 +54,7 @@ class HassioSensor:
                     ")
         #Mando el discovery para configurar el sensor
         self.client.publish(self.discovery_topic,self.discovery_payload)
-        sleep(1)
+        sleep(.5)
         
         #Habilito el estado del sensor
         self.client.publish(self.availability_topic,"online")
@@ -150,9 +150,17 @@ class BoxListener:
             logger.warning(f'no se encontró la informacion de la caja {payload["box_id"]} en el sensor {payload["sensor_id"]}')
         return error
     
+    def listener_loop(self):
+        if  not(self.client.is_connected()):
+            logger.warning(f"escucha desconectada... ")
+        self.client.loop()
+        
     def sensor_loop(self):
         for sensor in self.sensor_dict:
             for sensor_type in self.sensor_dict[sensor]:
+                if  not(self.sensor_dict[sensor][sensor_type].client.is_connected()):
+                    logger.warning(f" {self.sensor_dict[sensor][sensor_type].id} DESCONECTADO")
+                    
                 self.sensor_dict[sensor][sensor_type].client.loop()
             
         
