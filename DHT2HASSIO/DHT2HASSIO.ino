@@ -7,7 +7,7 @@
 
 #include "box_id.h"
 
-#define INTERVALO 1000
+#define INTERVALO 3000
 
 #define N_DHT 6
 
@@ -56,13 +56,13 @@ char clientId[16]="arduinoClient";
 
 
 
-const char* outTopic="testtopic/box_arduino/data";
+const char* outTopic="testtopic/box_arduino";
 
-const char* statusTopic="testtopic/box_arduino/status";
+// const char* statusTopic="testtopic/box_arduino/status";
 
-String statusMessage="\{\"box_id\":"+String(BOX_ID)+",\"online\":";
-String birthMessage= statusMessage + "true\}";
-String willMessage= statusMessage + "false\}";
+// String statusMessage="\{\"box_id\":"+String(BOX_ID)+",\"online\":";
+// String birthMessage= statusMessage + "true\}";
+// String willMessage= statusMessage + "false\}";
 
 // Inicializo los sensores DHT.
 DHT dht[N_DHT]=
@@ -83,11 +83,11 @@ void reconnect() {
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
   
-    if (client.connect(clientId,"","",statusTopic,WILL_QoS,WILL_RETAIN,willMessage.c_str())) {
+    if (client.connect(clientId)) {
       // Serial.println("connected");
       Serial.println(clientId);
       // Once connected, publish an announcement...
-      client.publish(statusTopic,birthMessage.c_str(),birthMessage.length(),1);
+      // client.publish(statusTopic,birthMessage.c_str(),birthMessage.length(),1);
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -116,11 +116,12 @@ void setup() {
 
   
 
-  client.setServer(server, 1883);
 
   byte mac[]= {  0xDE, 0xED, 0xBA, 0xFE, 0xFE, byte(random(0,256)) };
   Ethernet.begin(mac);
   Serial.println(Ethernet.localIP());
+
+  client.setServer(server, 1883);
   
 }
 
@@ -159,13 +160,13 @@ void data_JSON(DHT sensor, int box_id, int sensor_index,char *salida)
   hum=sensor.readHumidity();
   if(isnan(temp)||isnan(hum))
   {
-    lectura["temperatura"]="nan";
-    lectura["humedad"]="nan";
+    lectura["temp"]="nan";
+    lectura["hum"]="nan";
   }
   else
   {
-    lectura["temperatura"]=temp;    
-    lectura["humedad"]=hum;    
+    lectura["temp"]=temp;    
+    lectura["hum"]=hum;    
   }
 
   serializeJson(lectura,data);
