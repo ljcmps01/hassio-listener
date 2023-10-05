@@ -50,7 +50,7 @@ class MqqtHandler():
     def connection_callback(self,client ,userdata, mid, granted_qos):    
         logger.info(f"Cliente conectado")
         
-    def reconnect(self,client ,userdata, mid, granted_qos):
+    def reconnect(self,client="" ,userdata="", mid="", granted_qos=""):
         self.connect()
         self.add_subscriptions()
             
