@@ -1,2 +1,6 @@
 /__pycache__
 /utils/__pycache__
+DHT2HASSIO/.vscode/c_cpp_properties.json
+DHT2HASSIO/.vscode/settings.json
+.vscode/launch.json
+DHT2HASSIO/bin/arduino-cli.exe

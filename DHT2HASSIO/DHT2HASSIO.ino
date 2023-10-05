@@ -1,3 +1,4 @@
+#include <arduino.h>
 #include <SPI.h>
 #include <Ethernet.h>
 #include <PubSubClient.h>
@@ -24,36 +25,20 @@
 #define WILL_RETAIN 1
 
 
-//Opciones: 
-//"bajo","bouchard","cuadri","entrepiso","fuente",
-//"principal","ruleta","vip"
-// const char* salas[6]={
-//   SALA_SENSOR0,
-//   SALA_SENSOR1,
-//   SALA_SENSOR2,
-//   SALA_SENSOR3,
-//   SALA_SENSOR4,
-//   SALA_SENSOR5
-// };
+boolean conexionExitosa = false;
+unsigned long ultimaConexionIntentada = 0;
+const unsigned long intervaloReconexion = 5000; // Intervalo entre intentos de reconexión (en milisegundos)
 
-// const int id[6]={
-//   ID_SENSOR0,
-//   ID_SENSOR1,
-//   ID_SENSOR2,
-//   ID_SENSOR3,
-//   ID_SENSOR4,
-//   ID_SENSOR5
-// };
 
-// const char* server = "bingolab.local";
-IPAddress server(192, 168, 20, 136);
+const char* server = "bingolab.local";
+// IPAddress server(192, 168, 20, 136);
 
 EthernetClient ethClient;
 PubSubClient client(ethClient);
 
 char clientId[16]="arduinoClient";
 
-
+byte macBuffer[6];
 
 
 const char* outTopic="testtopic/box_arduino";
@@ -80,20 +65,27 @@ DHT dht[N_DHT]=
 void reconnect() {
   // Loop until we're reconnected
   while (!client.connected()) {
-    Serial.print("Attempting MQTT connection...");
-    // Attempt to connect
-  
-    if (client.connect(clientId)) {
-      // Serial.println("connected");
-      Serial.println(clientId);
-      // Once connected, publish an announcement...
-      // client.publish(statusTopic,birthMessage.c_str(),birthMessage.length(),1);
-    } else {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
-      delay(5000);
+    if (!conexionExitosa && (millis() - ultimaConexionIntentada >= intervaloReconexion)) {
+      Serial.println("Intentando conectar al servidor MQTT...");
+    
+      if (Ethernet.begin(macBuffer) == 0){
+        Serial.print("Error en la conexion ethernet, reintentando en 5 segundos...");
+      }
+
+      else{
+        if (client.connect(clientId)) {
+          Serial.println("conectado");
+          Serial.println(clientId);
+          conexionExitosa = true;
+        } 
+      
+        else {
+          Serial.print("fallo la conexion, rc=");
+          Serial.print(client.state());
+          Serial.println(" reintentando en 5 segundos...");
+        }
+      }
+    ultimaConexionIntentada = millis(); // Actualiza el tiempo del último intento de conexión
     }
   }
 }
@@ -119,6 +111,13 @@ void setup() {
 
   byte mac[]= {  0xDE, 0xED, 0xBA, 0xFE, 0xFE, byte(random(0,256)) };
   Ethernet.begin(mac);
+  Ethernet.MACAddress(macBuffer);
+  for(int i=0;i<6;i++)
+  {
+    Serial.print(macBuffer[i],HEX);
+    Serial.print(" ")
+  }
+  Serial.println();
   Serial.println(Ethernet.localIP());
 
   client.setServer(server, 1883);
@@ -126,15 +125,17 @@ void setup() {
 }
 
 void loop() {
-  if (!client.connected()) {
-    reconnect();
-  }  
-
-    client.loop();
   char data[200];
   
   for(int i=0;i<N_DHT;i++)
   {
+    if (!client.connected()) {
+      reconnect();
+    }  
+
+    client.loop();
+    Ethernet.maintain();
+
     Serial.println(i);
     data_JSON(dht[i],BOX_ID,i,data);
     Serial.println(data);
@@ -142,7 +143,7 @@ void loop() {
     client.publish(outTopic,data);
 
     delay(INTERVALO);
-    client.loop();
+    
   }
 }
 
