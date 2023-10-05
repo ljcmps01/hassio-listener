@@ -9,8 +9,15 @@ from time import sleep
 
 config_path = "/home/laboratorio_sv/scripts/hassio-listener/Box_config.json"
 
+
+mqtt_server = "bingolab.local"
+mqtt_port = 1883
+
 journal.send("Abriendo archivo de configuracion")
 config_JSON = json_utilities.leerJSON(config_path)
+
+mqtt = hass.MqqtHandler(mqtt_server,mqtt_port)
+mqtt.connect()
 
 if(config_JSON != ""):
     journal.send("configuracion cargada exitosamente")
@@ -20,12 +27,11 @@ else:
 
 box_topic = "testtopic/box_arduino"
 
-box_listener = hass.BoxListener(box_topic, config_JSON)
+box_listener = hass.BoxListener(box_topic, config_JSON,mqtt)
     
 while True:
     box_listener.listener_loop()
     
-    box_listener.sensor_loop()
     sleep(.5)
     
     

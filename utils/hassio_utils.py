@@ -14,18 +14,81 @@ logger.addHandler(journal.JournalHandler())
 
 
 #dev
-topic_root = "testtopic/test"
-discovery_root = "testtopic/test"
+# topic_root = "testtopic/test"
+# discovery_root = "testtopic/test/discovery"
 
 #prod
-# topic_root = "bingo"
-# discovery_root = "homeassistant"
+topic_root = "bingo"
+discovery_root = "homeassistant"
+
+            
+class MqqtHandler():
+
+    def __init__(self,server:str,port=1883, sub_topics = list()):
+        self.client = mqtt.Client()
+        self.sub_topics = sub_topics
+        self.server = server
+        self.port = port
+        
+        self.client.on_connect = self.connection_callback
+        self.client.on_disconnect = self.reconnect
+        
+    def connect(self):
+        logger.info(f"Conectando cliente al servidor {self.server} en el puerto {self.port}")
+        
+        if not self.client.is_connected():
+            self.client.connect(self.server, self.port)
+            self.client.loop()
+            
+            while not self.client.is_connected():
+                logger.error(f"Error al conectar al servidor")
+                logger.info("Reintentando en 1 segundo...")
+                sleep(1)
+                self.client.connect(self.server, self.port)
+                self.client.loop()
+        
+    def connection_callback(self,client ,userdata, mid, granted_qos):    
+        logger.info(f"Cliente conectado")
+        
+    def reconnect(self,client ,userdata, mid, granted_qos):
+        self.connect()
+        self.add_subscriptions()
+            
+    def loop(self):
+        self.client.loop()    
+        
+    def append_subscription(self,topic:str):
+        self.sub_topics.append(topic)
+    
+    def add_subscriptions(self):
+        for topic in self.sub_topics:
+            self.client.subscribe(topic)
+            
+    def set_sub_callback(self,callback):
+        self.client.on_message = callback
+        
+    def publish(self,topic:str,message:str,retain = False):
+        error = False
+        logger.info(f"enviando al topic {topic}:\n{message}")
+        
+        if self.client.is_connected():
+            self.client.publish(topic,message,retain= retain)
+            error = True
+        else:
+            logger.warning("cliente desconectado!")
+            self.reconnect()
+            
+        return error
+        
+    
+    def is_connected(self):
+        return self.client.is_connected()
 
 class HassioSensor:
     #Generar unico por entidad (temperatura y humedad independientes)
     #Testear las propiedad enabled_by_default  y expire_after 
     #Probar si con el atributo device_class se eligen automaticamente las unidades de medida
-    def __init__(self, sensor_id:str, sensor_type:str,sensor_unit:str, sala:str):
+    def __init__(self, sensor_id:str, sensor_type:str,sensor_unit:str, sala:str, mqtt_client:MqqtHandler):
         
         self.id = f"{sensor_type}_{sensor_id}"
         
@@ -40,24 +103,28 @@ class HassioSensor:
         
         self.discovery_payload = self.build_discovery_payload(self.type,self.unit)
         
-        self.client = mqtt.Client()
+        self.client = mqtt_client
+        self.online = self.discover_sensor()
         
-        self.client.connect(mqtt_server,mqtt_port)
-        self.client.on_connect = self.connect_callback
         
-    def connect_callback(self,client ,userdata, mid, granted_qos):
+        
+    def discover_sensor(self):
         logger.info(f"sensor {self.id} conectado exitosamente")
         logger.info(f"sensor {self.id}:\n\
                     discovery topic: {self.discovery_topic}\n\
                     discovery payload: {self.discovery_payload}\n\n\
                     availability topic: {self.availability_topic}\n\
                     ")
+        
         #Mando el discovery para configurar el sensor
-        self.client.publish(self.discovery_topic,self.discovery_payload)
+        error = self.client.publish(self.discovery_topic,self.discovery_payload,True)
+        logger.info(f"Discovery de sensor {self.id} enviado")
+        #Habilito el estado del sensor
+        self.client.publish(self.availability_topic,"online",True)
         sleep(.5)
         
-        #Habilito el estado del sensor
-        self.client.publish(self.availability_topic,"online")
+        return error
+        
         
         
     
@@ -101,25 +168,26 @@ class HassioSensor:
                 break
             else:
                 logger.warning(f"sensor {self.id} no conectado")
-                self.client.connect(mqtt_server,mqtt_port)
+                self.client.reconnect()
+                self.discover_sensor()
                 error = True
                 err_count+=1            
         
         return error
     
 class BoxListener:
-    def __init__(self,box_topic:str, config_dict:dict):
-        self.client = mqtt.Client()
+    def __init__(self,box_topic:str, config_dict:dict, mqtt_client:MqqtHandler):
+        self.mqtt_client = mqtt_client
         self.in_topic = box_topic
         self.sensor_dict = dict()
         self.boxes_config = config_dict
         
-        self.client.connect(mqtt_server,mqtt_port)
-        self.client.subscribe(self.in_topic)
+        self.mqtt_client.append_subscription(self.in_topic)
+        self.mqtt_client.add_subscriptions()
         
-        self.client.on_message = self.message_arrive
+        self.mqtt_client.set_sub_callback(self.message_arrive)
         
-    def message_arrive(self, client, userdata, message:mqtt.MQTTMessage):
+    def message_arrive(self, mqtt_client, userdata, message:mqtt.MQTTMessage):
         error = False
         payload = json.loads(message.payload)
         
@@ -133,8 +201,8 @@ class BoxListener:
             if not(sensor_id in self.sensor_dict):
                 logger.info(f'Creando sensor:{sensor_id}')
 
-                new_temp_sensor = HassioSensor(sensor_id,"temperature","°C",sala)
-                new_hum_sensor = HassioSensor(sensor_id,"humidity","%",sala)
+                new_temp_sensor = HassioSensor(sensor_id,"temperature","°C",sala,mqtt_client)
+                new_hum_sensor = HassioSensor(sensor_id,"humidity","%",sala,mqtt_client)
                 
                 self.sensor_dict.update({
                     sensor_id : {"temperature":new_temp_sensor,
@@ -151,20 +219,8 @@ class BoxListener:
         return error
     
     def listener_loop(self):
-        if  not(self.client.is_connected()):
-            logger.warning(f"escucha desconectada... ")
-        self.client.loop()
-        
-    def sensor_loop(self):
-        for sensor in self.sensor_dict:
-            for sensor_type in self.sensor_dict[sensor]:
-                if  not(self.sensor_dict[sensor][sensor_type].client.is_connected()):
-                    logger.warning(f" {self.sensor_dict[sensor][sensor_type].id} DESCONECTADO")
-                    
-                self.sensor_dict[sensor][sensor_type].client.loop()
-            
-        
-        
+        self.mqtt_client.loop()
+     
         
     
     
