@@ -4,4 +4,8 @@ Servicio que funciona como interfaz entre la informacion de sensores DHT22 envia
 
 ## To Do
 
-Arreglar funcion de reconexion, (missing pos arg grantedQoS)
+* [DHT2HASSIO] Ver si se puede ingresar la ip del servidor por hostname y no necesariamente por ip
+* [DHT2HASSIO] Avisar al usuario que la compilacion y/o la carga falló
+* [DHT2HASSIO] Capacidad de cambiar la ip del servidor desde linea de comando y desde cli
+
+* []

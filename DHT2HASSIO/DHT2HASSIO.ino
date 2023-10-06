@@ -30,8 +30,8 @@ unsigned long ultimaConexionIntentada = 0;
 const unsigned long intervaloReconexion = 5000; // Intervalo entre intentos de reconexión (en milisegundos)
 
 
-const char* server = "bingolab.local";
-// IPAddress server(192, 168, 20, 136);
+// const char* server = "bingolab.local";
+IPAddress server(192, 168, 20, 136);
 
 EthernetClient ethClient;
 PubSubClient client(ethClient);
@@ -115,7 +115,7 @@ void setup() {
   for(int i=0;i<6;i++)
   {
     Serial.print(macBuffer[i],HEX);
-    Serial.print(" ")
+    Serial.print(" ");
   }
   Serial.println();
   Serial.println(Ethernet.localIP());
