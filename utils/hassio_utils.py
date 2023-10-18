@@ -25,37 +25,45 @@ discovery_root = "homeassistant"
 class MqqtHandler():
 
     def __init__(self,server:str,port=1883, sub_topics = list()):
+        """Inicializacion del cliente mqtt
+
+        Args:
+            server (str): direccion mDNS del servidor mqtt
+            port (int, optional): Puerto de conexion del servidor mqtt. Defaults to 1883.
+            sub_topics (list/str, optional): topics a los que se desea subscribir, es opcional, pueden agregarse nuevos topics luego en el programa. Defaults to list().
+        """
         self.client = mqtt.Client()
         self.sub_topics = sub_topics
         self.server = server
         self.port = port
+        self.client_status = self.client.is_connected()
         
         self.client.on_connect = self.connection_callback
         self.client.on_disconnect = self.reconnect
         
     def connect(self):
         logger.info(f"Conectando cliente al servidor {self.server} en el puerto {self.port}")
-        
-        if not self.client.is_connected():
+        sleep(1)            
+        while not self.client.is_connected():
+            logger.error(f"Error al conectar al servidor")
+            logger.info("Reintentando en 1 segundo...")
+            sleep(1)
             self.client.connect(self.server, self.port)
             self.client.loop()
-            
-            while not self.client.is_connected():
-                logger.error(f"Error al conectar al servidor")
-                logger.info("Reintentando en 1 segundo...")
-                sleep(1)
-                self.client.connect(self.server, self.port)
-                self.client.loop()
         
     def connection_callback(self,client ,userdata, mid, granted_qos):    
         logger.info(f"Cliente conectado")
         
     def reconnect(self,client="" ,userdata="", mid="", granted_qos=""):
-        self.connect()
+        logger.error(f"Cliente desconectado")
+        logger.error(f"Intentando reconexion en 3 segundos...")
+        sleep(3)
+        self.client.reconnect()
         self.add_subscriptions()
             
     def loop(self):
-        self.client.loop()    
+        self.client.loop() 
+        self.client_status=self.client.is_connected()   
         
     def append_subscriptions(self,subscription):
         subscriptions_count=0
