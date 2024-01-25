@@ -25,47 +25,65 @@ discovery_root = "homeassistant"
 class MqqtHandler():
 
     def __init__(self,server:str,port=1883, sub_topics = list()):
+        """Inicializacion del cliente mqtt
+
+        Args:
+            server (str): direccion mDNS del servidor mqtt
+            port (int, optional): Puerto de conexion del servidor mqtt. Defaults to 1883.
+            sub_topics (list/str, optional): topics a los que se desea subscribir, es opcional, pueden agregarse nuevos topics luego en el programa. Defaults to list().
+        """
         self.client = mqtt.Client()
         self.sub_topics = sub_topics
         self.server = server
         self.port = port
+        self.client_status = self.client.is_connected()
         
         self.client.on_connect = self.connection_callback
         self.client.on_disconnect = self.reconnect
         
     def connect(self):
         logger.info(f"Conectando cliente al servidor {self.server} en el puerto {self.port}")
-        
-        if not self.client.is_connected():
+        sleep(1)            
+        while not self.client.is_connected():
+            logger.error(f"Error al conectar al servidor")
+            logger.info("Reintentando en 1 segundo...")
+            sleep(1)
             self.client.connect(self.server, self.port)
             self.client.loop()
-            
-            while not self.client.is_connected():
-                logger.error(f"Error al conectar al servidor")
-                logger.info("Reintentando en 1 segundo...")
-                sleep(1)
-                self.client.connect(self.server, self.port)
-                self.client.loop()
         
     def connection_callback(self,client ,userdata, mid, granted_qos):    
         logger.info(f"Cliente conectado")
         
     def reconnect(self,client="" ,userdata="", mid="", granted_qos=""):
-        self.connect()
+        logger.error(f"Cliente desconectado")
+        logger.error(f"Intentando reconexion en 3 segundos...")
+        sleep(3)
+        self.client.reconnect()
         self.add_subscriptions()
             
     def loop(self):
-        self.client.loop()    
+        self.client.loop() 
+        self.client_status=self.client.is_connected()   
         
-    def append_subscription(self,topic:str):
-        self.sub_topics.append(topic)
+    def append_subscriptions(self,subscription):
+        subscriptions_count=0
+        
+        if type(subscription) is str:
+            self.sub_topics.append(subscription)
+        elif type(subscription) is list:
+            for topic in subscription:
+                self.sub_topics.append(topic)
+        else:
+            logger.error(f"{subscription} es un topic de subscripcion invalido")
+        
+        return subscriptions_count
     
     def add_subscriptions(self):
         for topic in self.sub_topics:
             self.client.subscribe(topic)
             
-    def set_sub_callback(self,callback):
-        self.client.on_message = callback
+    def set_sub_callback(self,topic:str,callback):
+        self.client.message_callback_add(topic,callback)
         
     def publish(self,topic:str,message:str,retain = False):
         error = False
@@ -120,7 +138,7 @@ class HassioSensor:
         error = self.client.publish(self.discovery_topic,self.discovery_payload,True)
         logger.info(f"Discovery de sensor {self.id} enviado")
         #Habilito el estado del sensor
-        self.client.publish(self.availability_topic,"online",True)
+        self.client.publish(self.availability_topic,"online",retain=True)
         sleep(.5)
         
         return error
@@ -163,7 +181,7 @@ class HassioSensor:
             if self.client.is_connected():
                 self.client.publish(self.availability_topic,"online",retain=True)
                 sleep(.5)
-                self.client.publish(self.stat_topic,value,retain=True)
+                self.client.publish(self.stat_topic,value)
                 error = False
                 break
             else:
@@ -181,11 +199,23 @@ class BoxListener:
         self.in_topic = box_topic
         self.sensor_dict = dict()
         self.boxes_config = config_dict
-        
-        self.mqtt_client.append_subscription(self.in_topic)
+        self.server_birth_toppic = "homeassistant/status"
+
+        self.mqtt_client.append_subscriptions([self.in_topic,self.server_birth_toppic])
         self.mqtt_client.add_subscriptions()
         
-        self.mqtt_client.set_sub_callback(self.message_arrive)
+        self.mqtt_client.set_sub_callback(self.in_topic,self.message_arrive)
+        self.mqtt_client.set_sub_callback(self.server_birth_toppic,self.reinit_all_sensors)
+        
+    def reinit_all_sensors(self, mqtt_client, userdata, message:mqtt.MQTTMessage):
+        logger.warning("Servidor reiniciado, redescubriendo sensores...")
+        sleep(1)
+        
+        for sensor_id in self.sensor_dict:
+            sensor=self.sensor_dict[sensor_id]
+            sensor["temperature"].discover_sensor()
+            sensor["humidity"].discover_sensor()
+            
         
     def message_arrive(self, mqtt_client, userdata, message:mqtt.MQTTMessage):
         error = False
