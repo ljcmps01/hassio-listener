@@ -8,6 +8,8 @@
 
 #include "box_id.h"
 
+// #define SERVER_IP 192, 168, 20, 136
+
 #define INTERVALO 3000
 
 #define N_DHT 6
@@ -31,7 +33,7 @@ const unsigned long intervaloReconexion = 5000; // Intervalo entre intentos de r
 
 
 // const char* server = "bingolab.local";
-IPAddress server(192, 168, 20, 136);
+IPAddress server(SERVER_IP);
 
 EthernetClient ethClient;
 PubSubClient client(ethClient);

@@ -2,6 +2,8 @@ import os
 import subprocess
 import argparse
 
+from default_config import server_ip
+
 arduino_cli_path ="bin/arduino-cli.exe"
 exit = ""
 box_id = ""
@@ -44,9 +46,9 @@ def cargar_sketch(ruta_sketch, puerto_com):
     proceso_carga.wait()
     print("Carga completada.")
     
-def crear_header(box_id):
+def crear_header(box_id,server_ip):
     with open("box_id.h","w") as header_id:
-        valor = f"#define BOX_ID {str(box_id)}\n"
+        valor = f"#define BOX_ID {str(box_id)}\n#define SERVER_IP {server_ip.replace('.',',')}\n"
         header_id.write(valor)
         
         print(f"Header generado exitosamente, se cargó:\n{valor}")
@@ -73,12 +75,13 @@ if __name__ == "__main__":
             print("No se encontraron puertos COM disponibles.")
             exit = input("Presione enter para reintentar, otra tecla para salir\n")
         else:
+            print(f"Direccion IP: {server_ip}")
             print("Puertos COM disponibles:")
             for i, puerto in enumerate(puertos_com):
                 print(f"{i+1}: {puerto}")
 
             # Elegir un puerto COM
-            seleccion = int(input("Elija un puerto COM (1-{0}, o ingrese 0 para salir): ".format(len(puertos_com))))
+            seleccion = int(input("Elija un puerto COM (1-{0}, ingrese 0 para salir o -1 para modificar IP): ".format(len(puertos_com))))
             
 
             if 1 <= seleccion <= len(puertos_com):
@@ -86,7 +89,7 @@ if __name__ == "__main__":
                 # Si no se ingreso el id por la linea de comandos, ahora se le pregunta al usuario por su valor
                 while box_id_flag:
                     if type(box_id) is int:
-                        crear_header(box_id)
+                        crear_header(box_id,server_ip)
                         box_id_flag = False
                         box_id = ""
                     
@@ -106,5 +109,8 @@ if __name__ == "__main__":
                 cargar_sketch(ruta_sketch, puerto_elegido)
             elif seleccion == 0:
                 exit = "exit"
+            
+            elif seleccion == -1:
+                server_ip=input("ingrese nueva ip del servidor: ")
             else:
                 print("Selección no válida.")
