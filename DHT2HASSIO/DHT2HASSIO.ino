@@ -2,13 +2,13 @@
 #include <SPI.h>
 #include <Ethernet.h>
 #include <PubSubClient.h>
+// #include "avr/wdt.h"
 
 #include "DHT.h"
 #include <ArduinoJson.h>
 
 #include "box_id.h"
 
-// #define SERVER_IP 192, 168, 20, 136
 
 #define INTERVALO 3000
 
@@ -38,7 +38,7 @@ IPAddress server(SERVER_IP);
 EthernetClient ethClient;
 PubSubClient client(ethClient);
 
-char clientId[16]="arduinoClient";
+char clientId[18]="arduinoClientHT";
 
 byte macBuffer[6];
 
@@ -93,11 +93,10 @@ void reconnect() {
 }
 
 void setup() {
-  randomSeed(analogRead(A0));
-  int rNum=random(0,999);
-  char cRandom[5];
-  itoa(rNum,cRandom,6);
-  strcat(clientId,cRandom);
+  // wdt_disable();
+  char cID[5];
+  itoa(BOX_ID,cID,10);
+  strcat(clientId,cID);
   // Serial.println(clientId);
   Serial.begin(9600);
   Serial.print("BOX: ");
@@ -111,7 +110,7 @@ void setup() {
   
 
 
-  byte mac[]= {  0xDE, 0xED, 0xBA, 0xFE, 0xFE, byte(random(0,256)) };
+  byte mac[]= {  0xDE, 0xED, 0xBA, 0xFE, 0xFE, byte(BOX_ID) };
   Ethernet.begin(mac);
   Ethernet.MACAddress(macBuffer);
   for(int i=0;i<6;i++)
@@ -123,7 +122,9 @@ void setup() {
   Serial.println(Ethernet.localIP());
 
   client.setServer(server, 1883);
-  
+  Serial.print("Conectadose a servidor: ");
+  Serial.println(server);
+  // wdt_enable(WDTO_8S);
 }
 
 void loop() {
@@ -143,7 +144,7 @@ void loop() {
     Serial.println(data);
     
     client.publish(outTopic,data);
-
+    // wdt_reset();
     delay(INTERVALO);
     
   }

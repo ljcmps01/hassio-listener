@@ -5,5 +5,5 @@ DHT2HASSIO/.vscode/settings.json
 .vscode/launch.json
 DHT2HASSIO/bin/arduino-cli.exe
 DHT2HASSIO/__pycache__/*
-DHT2HASSIO/default_config.py
-DHT2HASSIO/box_id.h
+/DHT2HASSIO/default_config.py
+/DHT2HASSIO/box_id.h
