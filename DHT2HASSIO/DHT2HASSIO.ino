@@ -2,7 +2,7 @@
 #include <SPI.h>
 #include <Ethernet.h>
 #include <PubSubClient.h>
-// #include "avr/wdt.h"
+#include "avr/wdt.h"
 
 #include "DHT.h"
 #include <ArduinoJson.h>
@@ -93,7 +93,7 @@ void reconnect() {
 }
 
 void setup() {
-  // wdt_disable();
+  wdt_disable();
   char cID[5];
   itoa(BOX_ID,cID,10);
   strcat(clientId,cID);
@@ -124,7 +124,7 @@ void setup() {
   client.setServer(server, 1883);
   Serial.print("Conectadose a servidor: ");
   Serial.println(server);
-  // wdt_enable(WDTO_8S);
+  wdt_enable(WDTO_8S);
 }
 
 void loop() {
@@ -144,7 +144,7 @@ void loop() {
     Serial.println(data);
     
     client.publish(outTopic,data);
-    // wdt_reset();
+    wdt_reset();
     delay(INTERVALO);
     
   }
